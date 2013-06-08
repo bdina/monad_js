@@ -2,12 +2,12 @@ const doMonad = function ( monad ) {
     const args = arguments, scope = {}
     function iterator (i) {
         if ( args.length === i + 1 ) {
-            return monad.mReturn(args[i](scope))
+            return monad.unit(args[i](scope))
         }
         const varName = args[i]
         const fn = args[i + 1]
         const value = fn(scope)
-        return monad.mBind(value, function (value) {
+        return monad.bind(value, function (value) {
             scope[varName] = value
             return iterator(i + 2)
         })
@@ -16,41 +16,41 @@ const doMonad = function ( monad ) {
 }
 
 const identityMonad = {
-    mBind: function ( value, fn ) {
+    bind: function ( value, fn ) {
         return fn(value)
     },
-    mReturn: function ( value ) {
+    unit: function ( value ) {
         return value
     }
 }
 
 const maybeMonad = {
-    mBind: function ( value, fn ) {
+    bind: function ( value, fn ) {
         if ( value === null )
             return null
         else
             return fn ( value )
     },
-    mReturn: function ( value ) {
+    unit: function ( value ) {
         return value
     }
 }
 
 const arrayMonad = {
-    mBind: function ( value, fn ) {
+    bind: function ( value, fn ) {
         var accum = []
         value.forEach ( function ( elem ) {
             accum = accum.concat( fn ( elem ) )
         } )
         return accum
     },
-    mReturn: function ( value ) {
+    unit: function ( value ) {
         return [value]
     }
 }
 
 const stateMonad = {
-    mBind: function ( value, fn ) {
+    bind: function ( value, fn ) {
         return function ( state ) {
             const compute = value(state)
             const v = compute[0]
@@ -58,7 +58,7 @@ const stateMonad = {
             return fn ( v ) ( newState )
         }
     },
-    mReturn: function ( value ) {
+    unit: function ( value ) {
         return function ( state ) {
             return [value, state]
         }
@@ -149,7 +149,31 @@ const state_result = doMonad ( stateMonad,
     }
 )
 
-console.log("IDENTITY: " + identity_result)
-console.log("MAYBE:    " + maybe_result)
-console.log("ARRAY:    " + array_result)
-console.log("STATE:    " + state_result([]))
+const rmf = function () {
+    return function ( state ) {
+        const len = state.length
+        return [undefined,state.substring(1,len)]
+    }
+}
+
+const rml = function () {
+    return function ( state ) {
+        const len = state.length - 1
+        return [undefined,state.substring(0,len)]
+    }
+}
+
+const remove_first_and_last = function (s) {
+    const apply = doMonad ( stateMonad,
+        "a", function () { return rmf() },
+        "b", function () { return rml() },
+        function ( scope ) { with ( scope ) { return b } }
+    )
+    return apply(s)[1]
+}
+
+console.log('IDENTITY:          ' + identity_result)
+console.log('MAYBE:             ' + maybe_result)
+console.log('ARRAY:             ' + array_result)
+console.log('STATE:             ' + state_result([]))
+console.log('NO FIRST AND LAST: ' + remove_first_and_last('bryan'))
